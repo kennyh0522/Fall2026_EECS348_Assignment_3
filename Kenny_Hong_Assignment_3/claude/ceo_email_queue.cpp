@@ -33,6 +33,7 @@
 #include <fstream>    // std::ifstream
 #include <string>     // std::string
 #include <cstdlib>    // std::atoi
+#include <utility>
 
 using namespace std;
 
@@ -44,6 +45,13 @@ using namespace std;
 // An Email knows how to rank itself against another Email, which is the only
 // thing the MaxHeap needs in order to keep the most important email on top.
 // =============================================================================
+
+// Named priority levels (bigger = read sooner). Used by Email::levelFor().
+const int PRIORITY_INVALID = 0;   // unrecognized sender category
+const int PRIORITY_LOW     = 1;   // OtherPerson
+const int PRIORITY_NORMAL  = 2;   // Subordinate, Peer, ImportantPerson
+const int PRIORITY_BOSS    = 3;   // Boss
+
 class Email {
 private:
     string senderCategory;  // "Boss", "Subordinate", "Peer", ...
@@ -51,6 +59,7 @@ private:
     string date;            // original text, MM-DD-YYYY (kept for display)
     int    dateKey;         // YYYYMMDD integer so dates compare numerically
     int    arrivalOrder;    // order the email was added; used as a tie-breaker
+    int priority;           // computed once at construction, never recomputed
 
     // -------------------------------------------------------------------------
     // Convert "MM-DD-YYYY" into the integer YYYYMMDD.
@@ -71,15 +80,17 @@ private:
 public:
     // Default constructor: needed because the heap's array is allocated with
     // `new Email[capacity]`, which default-constructs every slot.
-    Email() : senderCategory(""), subject(""), date(""), dateKey(0), arrivalOrder(0) {}
-
+    Email() : senderCategory(""), subject(""), date(""), dateKey(0),
+              arrivalOrder(0), priority(PRIORITY_INVALID) {}
     // Full constructor used when an EMAIL command is parsed.
     Email(const string& category, const string& subj, const string& dt, int order)
-        : senderCategory(category),
-          subject(subj),
-          date(dt),
-          dateKey(makeDateKey(dt)),
-          arrivalOrder(order) {}
+            : senderCategory(category),
+            subject(subj),
+            date(dt),
+            dateKey(makeDateKey(dt)),
+            arrivalOrder(order),
+            priority(levelFor(category)) {}   // string comparisons happen only once, here
+
 
     // --- Simple accessors ----------------------------------------------------
     string getSenderCategory() const { return senderCategory; }
@@ -92,29 +103,25 @@ public:
     // Subordinate, Peer and ImportantPerson are all "read next", so they share
     // the same level (and are therefore ordered by date among themselves).
     // -------------------------------------------------------------------------
-    int priorityLevel() const {
-        if (senderCategory == "Boss")            return 3;  // read first
-        if (senderCategory == "Subordinate" ||
-            senderCategory == "Peer"        ||
-            senderCategory == "ImportantPerson") return 2;  // read next
-        return 1;                                           // OtherPerson: last
+
+    
+    // Single source of truth for category -> priority level.
+    static int levelFor(const string& category) {
+        if (category == "Boss")            return PRIORITY_BOSS;
+        if (category == "Subordinate" ||
+            category == "Peer"        ||
+            category == "ImportantPerson") return PRIORITY_NORMAL;
+        if (category == "OtherPerson")     return PRIORITY_LOW;
+        return PRIORITY_INVALID;
     }
 
-    // -------------------------------------------------------------------------
-    // hasHigherPriorityThan()
-    // Returns true if THIS email should be read before `other`.
-    // This single function defines the heap ordering.
-    // -------------------------------------------------------------------------
-    bool hasHigherPriorityThan(const Email& other) const {
-        // 1) Compare sender category level.
-        if (priorityLevel() != other.priorityLevel())
-            return priorityLevel() > other.priorityLevel();
+    int priorityLevel() const { return priority; }
 
-        // 2) Same level: the NEWER date (larger key) wins.
+    bool hasHigherPriorityThan(const Email& other) const {
+        if (priority != other.priority)       // integer compare, no strings
+            return priority > other.priority;
         if (dateKey != other.dateKey)
             return dateKey > other.dateKey;
-
-        // 3) Same level and same date: whoever arrived first wins.
         return arrivalOrder < other.arrivalOrder;
     }
 };

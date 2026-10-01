@@ -209,29 +209,32 @@ private:
      * and both Boss emails come before a Subordinate email,
      * even if the Subordinate email has a later date.
      */
-    bool higherPriority(Email* first, Email* second)
+   bool higherPriority(Email* first, Email* second)
+{
+    /*
+     * Compare the pre-calculated sender priorities first.
+     *
+     * Because Email stores senderPriority when it is created,
+     * we do not have to calculate the category priority again.
+     */
+    if (first->getSenderPriority() > second->getSenderPriority())
     {
-        // First compare sender category.
-        if (first->getSenderPriority() != second->getSenderPriority())
-        {
-            return first->getSenderPriority() >
-                   second->getSenderPriority();
-        }
+        return true;
+    }
 
-        // If the sender categories are the same, the newest
-        // email gets higher priority.
-        if (first->getDateValue() != second->getDateValue())
-        {
-            return first->getDateValue() >
-                   second->getDateValue();
-        }
-
-        /*
-         * If both category and date are identical, neither email
-         * has a higher priority than the other.
-         */
+    if (first->getSenderPriority() < second->getSenderPriority())
+    {
         return false;
     }
+
+    /*
+     * If both emails have the same sender priority,
+     * compare their dates.
+     *
+     * The larger dateValue represents the newer date.
+     */
+    return first->getDateValue() > second->getDateValue();
+}
 
 
     /*
