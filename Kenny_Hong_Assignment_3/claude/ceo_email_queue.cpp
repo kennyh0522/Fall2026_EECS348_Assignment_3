@@ -152,6 +152,7 @@ private:
     Email* data;       // dynamically allocated array holding the heap
     int    count;      // how many emails are currently stored
     int    capacity;   // how many emails the array can hold before growing
+    static const int MIN_CAPACITY = 8;   // never shrink below this
 
     // --- Index helpers -------------------------------------------------------
     static int parentOf(int i) { return (i - 1) / 2; }
@@ -170,15 +171,18 @@ private:
     // Double the array size when it is full: allocate a bigger array, copy
     // everything over, and free the old one.
     // -------------------------------------------------------------------------
-    void grow() {
-        int newCapacity = capacity * 2;
-        Email* bigger   = new Email[newCapacity];
+    // Reallocate the array to exactly newCapacity slots. Used for both
+    // growing and shrinking, so the copy logic lives in one place.
+    void resize(int newCapacity) {
+        Email* fresh = new Email[newCapacity];
         for (int i = 0; i < count; i++)
-            bigger[i] = data[i];
+            fresh[i] = std::move(data[i]);   // move, don't copy, the strings
         delete[] data;
-        data     = bigger;
+        data     = fresh;
         capacity = newCapacity;
     }
+
+    void grow() { resize(capacity * 2); }
 
     // -------------------------------------------------------------------------
     // siftUp()
@@ -224,7 +228,7 @@ private:
 
 public:
     // Constructor: start with a small array; it will grow as needed.
-    MaxHeap() : data(new Email[8]), count(0), capacity(8) {}
+    MaxHeap() : data(new Email[MIN_CAPACITY]), count(0), capacity(MIN_CAPACITY) {}
 
     // Destructor: release the dynamically allocated array.
     ~MaxHeap() { delete[] data; }
@@ -271,6 +275,12 @@ public:
         count--;
         if (count > 0)
             siftDown(0);
+
+        // Shrink when only a quarter full. Using 1/4 (not 1/2) for the trigger
+        // stops the array from flip-flopping between grow and shrink when the
+        // size hovers near a boundary, so resizing stays amortized O(1).
+        if (capacity > MIN_CAPACITY && count <= capacity / 4)
+            resize(capacity / 2);
     }
 };
 

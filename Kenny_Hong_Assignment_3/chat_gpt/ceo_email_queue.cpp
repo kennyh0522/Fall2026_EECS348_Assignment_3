@@ -345,6 +345,42 @@ private:
         }
     }
 
+    /*
+    * Shrinks the heap's underlying array when the heap is using
+    * significantly less space than its current capacity.
+    *
+    * The capacity is never allowed to fall below 10.
+    */
+    void shrink()
+    {
+        // Only shrink when the heap is at or below 25% capacity.
+        if (capacity > 10 && size <= capacity / 4)
+        {
+            int newCapacity = capacity / 2;
+
+            // Never shrink below the minimum capacity.
+            if (newCapacity < 10)
+            {
+                newCapacity = 10;
+            }
+
+            Email** newHeap = new Email*[newCapacity];
+
+            // Copy the remaining email pointers into the smaller array.
+            for (int i = 0; i < size; i++)
+            {
+                newHeap[i] = heap[i];
+            }
+
+            // Delete the old, larger array.
+            delete[] heap;
+
+            // Replace it with the smaller array.
+            heap = newHeap;
+            capacity = newCapacity;
+        }
+    }
+
 
 public:
 
@@ -447,6 +483,12 @@ public:
         {
             heapifyDown(0);
         }
+
+        /*
+        * If the heap has become mostly empty, reduce the amount
+        * of memory reserved for the underlying array.
+        */
+        shrink();
 
         return highestPriorityEmail;
     }
