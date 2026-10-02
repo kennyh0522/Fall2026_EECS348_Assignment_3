@@ -124,6 +124,26 @@ public:
             return dateKey > other.dateKey;
         return arrivalOrder < other.arrivalOrder;
     }
+
+    // Checks "MM-DD-YYYY": correct shape, all digits, real month, and a day
+    // that exists in that month (leap years included).
+    static bool isValidDate(const string& d) {
+        if (d.size() != 10 || d[2] != '-' || d[5] != '-')
+            return false;
+        for (int i = 0; i < 10; i++) {
+            if (i == 2 || i == 5) continue;            // skip the dashes
+            if (d[i] < '0' || d[i] > '9') return false;
+        }
+        int month = atoi(d.substr(0, 2).c_str());
+        int day   = atoi(d.substr(3, 2).c_str());
+        int year  = atoi(d.substr(6, 4).c_str());
+        if (month < 1 || month > 12) return false;
+
+        static const int daysIn[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+        bool leap   = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+        int  maxDay = daysIn[month - 1] + ((month == 2 && leap) ? 1 : 0);
+        return day >= 1 && day <= maxDay;
+    }
 };
 
 
@@ -331,7 +351,18 @@ private:
         string subject  = trim(args.substr(firstComma + 1, lastComma - firstComma - 1));
         string date     = trim(args.substr(lastComma + 1));
 
-        // Build the Email object and push it into the priority queue.
+        // Reject bad input instead of crashing or silently misclassifying it.
+        if (Email::levelFor(category) == PRIORITY_INVALID) {
+            cerr << "Warning: unknown sender category '" << category
+                 << "', skipping line." << endl;
+            return;
+        }
+        if (!Email::isValidDate(date)) {
+            cerr << "Warning: invalid date '" << date
+                 << "', skipping line." << endl;
+            return;
+        }
+
         inbox.insert(Email(category, subject, date, nextArrival++));
     }
 

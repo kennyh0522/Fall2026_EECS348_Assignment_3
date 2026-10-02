@@ -399,15 +399,21 @@ public:
 
 
     /*
-     * Destructor
-     *
-     * Deletes the dynamically allocated array.
-     *
-     * The Email objects themselves are deleted when they are
-     * removed from the heap.
-     */
+    * Destructor
+    *
+    * Deletes every Email object that is still unread,
+    * then deletes the array containing their pointers.
+    *
+    * This prevents memory leaks when the program ends with
+    * unread emails still inside the heap.
+    */
     ~MaxHeap()
     {
+        for (int i = 0; i < size; i++)
+        {
+            delete heap[i];
+        }
+
         delete[] heap;
     }
 
